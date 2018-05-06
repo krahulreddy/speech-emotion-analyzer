@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+</head>
+
+<body>
+    <button id="recorder" onclick="start();">record</button>
+    <script>
+        // appends an audio element to playback and download recording
+        function createAudioElement(blobUrl) {
+            const downloadEl = document.createElement('a');
+            downloadEl.style = 'display: block';
+            downloadEl.innerHTML = 'download';
+            downloadEl.download = 'audio.webm';
+            downloadEl.href = blobUrl;
+            const audioEl = document.createElement('audio');
+            audioEl.controls = true;
+            const sourceEl = document.createElement('source');
+            sourceEl.src = blobUrl;
+            sourceEl.type = 'audio/webm';
+            audioEl.appendChild(sourceEl);
+            document.body.appendChild(audioEl);
+            document.body.appendChild(downloadEl);
+        }
+
+        // Send audio for data analysis
+        function sendDataToService(blob,callback){
+            var url = (window.URL || window.webkitURL).createObjectURL(blob);
+            console.log(url);
+
+            var data = new FormData();
+            data.append('file', blob);
+
+            $.ajax({
+                url: "lib/vocal_render.php",
+                type: 'POST',
+                data: data,
+                contentType: false,
+                processData: false,
+                success: function (data) {
+                    alert("boa!");
+                    callback("oh yeah!");
+                },
+                error: function () {
+                    alert("not so boa!");
+                    callback("it's gone for rats!");
+                }
+            });
+        }
+
+        // request permission to access audio stream
+        function start() {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                // store streaming data chunks in array
+                const chunks = [];
+                // create media recorder instance to initialize recording
+                const recorder = new MediaRecorder(stream);
+                // function to be called when data is received
+                recorder.ondataavailable = e => {
+                    // add stream data to chunks
+                    chunks.push(e.data);
+                    // if recorder is 'inactive' then recording has finished
+                    if (recorder.state == 'inactive') {
+                        // convert stream data chunks to a 'webm' audio format as a blob
+                        const blob = new Blob(chunks, { type: 'audio/webm' });
+                        // convert blob to URL so it can be assigned to a audio src attribute
+                        createAudioElement(URL.createObjectURL(blob));
+                        sendDataToService(blob, (status) => {
+                            CreateMarker(status)
+                        });
+                    }
+                };
+                // start recording with 1 second time between receiving 'ondataavailable' events
+                recorder.start(1000);
+                // setTimeout to stop recording after 4 seconds
+                setTimeout(() => {
+                    // this will trigger one final 'ondataavailable' event and set recorder state to 'inactive'
+                    recorder.stop();
+                    CreateMarker("Processing");
+                }, 10000);
+            }).catch(console.error);
+        }
+        function CreateMarker(txt){
+            const recordbtn = document.getElementById("recorder");
+            recordbtn.innerHTML = txt;
+        }
+    </script>
+</body>
+
+</html>
